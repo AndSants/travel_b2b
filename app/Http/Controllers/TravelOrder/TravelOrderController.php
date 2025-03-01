@@ -117,6 +117,13 @@ class TravelOrderController extends Controller
             ], 403);
         }
 
+        if ($travelOrder->status !== 'aprovado') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Apenas pedidos aprovados podem ser cancelados.',
+            ], 422); // 422 Unprocessable Entity
+        }
+
         // Atualiza apenas o status
         $travelOrder->update([
             'status' => $request->status,
