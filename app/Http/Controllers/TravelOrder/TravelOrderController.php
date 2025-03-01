@@ -7,6 +7,7 @@ use App\Http\Requests\StoreTravelOrderRequest;
 use App\Http\Requests\UpdateTravelOrderRequest;
 use App\Models\TravelOrder;
 use App\Models\User;
+use App\Notifications\TravelOrderStatusNotification;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -65,7 +66,7 @@ class TravelOrderController extends Controller
         if ($conflictingOrders->isNotEmpty()) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Conflito de datas com pedidos existentes.',
+                'message' => 'Date conflict with existing orders.',
                 'conflicts' => $conflictingOrders,
             ], 409);
         }
@@ -110,18 +111,25 @@ class TravelOrderController extends Controller
     public function update(UpdateTravelOrderRequest $request, TravelOrder $travelOrder)
 {
         // Verifica se o pedido pertence ao usuário autenticado
-        if ($travelOrder->user_id !== Auth::id()) {
+        // if ($travelOrder->user_id !== Auth::id()) {
+        //     return response()->json([
+        //         'status' => 'error',
+        //         'message' => 'You do not have permission to change this order.',
+        //     ], 403);
+        // }
+
+        if ($request->status === 'cancelado' && $travelOrder->status !== 'aprovado') {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Você não tem permissão para alterar este pedido.',
-            ], 403);
+                'message' => 'Only approved orders can be cancelled.',
+            ], 422);
         }
 
-        if ($travelOrder->status !== 'aprovado') {
+        if ($request->status === 'aprovado' && $travelOrder->status === 'aprovado') {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Apenas pedidos aprovados podem ser cancelados.',
-            ], 422); // 422 Unprocessable Entity
+                'message' => 'This request has already been approved.',
+            ], 422);
         }
 
         // Atualiza apenas o status
@@ -129,12 +137,16 @@ class TravelOrderController extends Controller
             'status' => $request->status,
         ]);
 
+        if (in_array($request->status, ['aprovado', 'cancelado'])) {
+            $travelOrder->user->notify(new TravelOrderStatusNotification($travelOrder, $request->status));
+        }
+
         return response()->json([
             'status' => 'success',
             'data' => [
                 'travelOrder' => $travelOrder,
             ],
-        ], 200); // 200 OK
+        ], 200);
     }
 
     /**
