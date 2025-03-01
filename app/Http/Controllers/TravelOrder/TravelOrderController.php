@@ -7,6 +7,7 @@ use App\Http\Requests\StoreTravelOrderRequest;
 use App\Http\Requests\UpdateTravelOrderRequest;
 use App\Models\TravelOrder;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,18 +18,37 @@ class TravelOrderController extends Controller
      */
     public function index(Request $request)
     {
-        $travelOrders = Auth::user()->travelOrders()->get();
+        $query = Auth::user()->travelOrders();
 
         if ($request->has('status')) {
-            $travelOrders = $travelOrders->where('status', $request->status);
+            $query->where('status', $request->status);
         }
+
+        if ($request->has('destination')) {
+            $query->where('destination', 'like', '%' . $request->destination . '%');
+        }
+
+        if ($request->has('departure_date') && $request->has('return_date')) {
+            $travelStartDate = Carbon::parse($request->departure_date)->startOfDay();
+            $travelEndDate = Carbon::parse($request->return_date)->endOfDay();
+
+            $query->where(function ($q) use ($travelStartDate, $travelEndDate) {
+                $q->where(function ($q) use ($travelStartDate, $travelEndDate) {
+                      $q->where('departure_date', '<=', $travelEndDate)
+                        ->where('return_date', '>=', $travelStartDate);
+                  });
+            });
+        }
+
+        $query->orderBy('created_at', 'desc');
+        $travelOrders = $query->paginate(10);
 
         return response()->json([
             'status' => 'success',
             'data' => [
                 'travelOrders' => $travelOrders,
             ],
-        ], 201);
+        ], 200);
     }
 
     /**
