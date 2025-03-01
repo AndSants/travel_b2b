@@ -7,6 +7,7 @@ use App\Http\Requests\StoreTravelOrderRequest;
 use App\Http\Requests\UpdateTravelOrderRequest;
 use App\Models\TravelOrder;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class TravelOrderController extends Controller
@@ -14,9 +15,13 @@ class TravelOrderController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $travelOrders = Auth::user()->travelOrders()->get();
+
+        if ($request->has('status')) {
+            $travelOrders = $travelOrders->where('status', $request->status);
+        }
 
         return response()->json([
             'status' => 'success',
