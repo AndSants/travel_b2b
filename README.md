@@ -55,10 +55,59 @@ Existe um arquivo de exemplo chamado '.env-exemple', você pode criar uma cópia
 Finalmente, você pode iniciar o Sail. Verifique documentação do Laravel para configurar um alias que permita executar os comandos do Sail mais facilmente.
 
 ```
+4.1. Inicie o container
 ./vendor/bin/sail up -d
 ```
 > [!IMPORTANT]\
-> Caso esteja utilizando `CACHE_STORE=database` em suas configurações do .env, lembre-se de executar a migração (`./vendor/bin/sail php artisan migrate`) após o build do projeto.
+> Lembre-se de executar a migração (`./vendor/bin/sail php artisan migrate`) após o build do projeto.
+
+```
+4.2. Gere a nova chave do projeto
+APP_KEY= (./vendor/bin/sail php artisan key:generate)
+```
+```
+4.3. Atualize o composer com a biblioteca
+./vendor/bin/sail composer require php-open-source-saver/jwt-auth
+4.4. Gere a chave JWT
+JWT_SECRET= (./vendor/bin/sail php artisan jwt:secret)
+```
+
+5. **Configuração do MailTrap**: 
+O Mailtrap é uma ótima ferramenta para testar o envio de e-mails em ambientes de desenvolvimento, pois ele simula um servidor SMTP e captura os e-mails enviados pela aplicação, sem enviá-los para destinatários reais. Vamos configurar o Laravel para usar o Mailtrap.
+
+```
+5.1. Acesse o site do [Mailtrap](https://mailtrap.io/).
+5.2. Crie uma conta gratuita ou faça login.
+5.3. No painel do Mailtrap, crie um novo Inbox (caixa de entrada) para o seu projeto.
+5.4. No arquivo .env do seu projeto Laravel, atualize as configurações de e-mail com as credenciais (username e password), confirme o host e porta do Mailtrap:
+
+MAIL_MAILER=smtp
+MAIL_SCHEME=null
+MAIL_HOST=sandbox.smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=seu_username
+MAIL_PASSWORD=seu_password
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+```
+5.5. Você pode testar o envio de e-mails usando o Tinker: ./vendor/bin/sail php artisan tinker
+5.6. No console do Tinker, execute o seguinte código:
+Mail::raw('Este é um e-mail de teste!', function ($message) {
+    $message->to('test@example.com')->subject('Teste de E-mail');
+});
+5.7. Execute o comando abaixo para criar a tabela de filas:
+./vendor/bin/sail php artisan queue:work
+```
+
+> [!IMPORTANT]\
+> Esta disponível a collection da API na raiz do projeto, exportada via postman.
+
+```
+Para executar os teste:
+./vendor/bin/sail php artisan test --coverage
+```
 
 ## 😊 Pronto
 
