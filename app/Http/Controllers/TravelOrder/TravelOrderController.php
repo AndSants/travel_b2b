@@ -3,14 +3,13 @@
 namespace App\Http\Controllers\TravelOrder;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreTravelOrderRequest;
-use App\Http\Requests\UpdateTravelOrderRequest;
+use App\Http\Requests\TravelOrder\UpdateTravelOrderRequest;
 use App\Models\TravelOrder;
-use App\Models\User;
 use App\Notifications\TravelOrderStatusNotification;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 class TravelOrderController extends Controller
 {
@@ -19,6 +18,29 @@ class TravelOrderController extends Controller
      */
     public function index(Request $request)
     {
+        // Validação manual
+        $validator = Validator::make($request->all(), [
+            'status' => 'nullable|string|in:solicitado,aprovado,cancelado',
+            'destination' => 'nullable|string|max:255',
+            'departure_date' => 'nullable|date',
+            'return_date' => 'nullable|date|after_or_equal:departure_date',
+        ], [
+            'status.in' => 'O status deve ser um dos seguintes: solicitado, aprovado, cancelado.',
+            'destination.max' => 'O destino não pode ter mais de 255 caracteres.',
+            'departure_date.date' => 'A data de partida deve ser uma data válida.',
+            'return_date.date' => 'A data de retorno deve ser uma data válida.',
+            'return_date.after_or_equal' => 'A data de retorno deve ser igual ou posterior à data de partida.',
+        ]);
+
+        // Se a validação falhar, retorne os erros
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Erro de validação',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        
         $query = Auth::user()->travelOrders();
 
         if ($request->has('status')) {
@@ -55,8 +77,31 @@ class TravelOrderController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreTravelOrderRequest $request)
+    public function store(Request $request)
     {
+        $validator = Validator::make($request->all(), [
+            'destination' => 'required|string|max:255',
+            'departure_date' => 'required|date',
+            'return_date' => 'required|date|after_or_equal:departure_date',
+        ], [
+            'destination.required' => 'O destino é obrigatório.',
+            'destination.max' => 'O destino não pode ter mais de 255 caracteres.',
+            'departure_date.required' => 'A data de partida é obrigatória.',
+            'departure_date.date' => 'A data de partida deve ser uma data válida.',
+            'return_date.required' => 'A data de retorno é obrigatória.',
+            'return_date.date' => 'A data de retorno deve ser uma data válida.',
+            'return_date.after_or_equal' => 'A data de retorno deve ser igual ou posterior à data de partida.',
+        ]);
+    
+        // Se a validação falhar, retorne os erros
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Erro de validação',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
         // Verifica se há conflitos com pedidos existentes
         $conflictingOrders = $this->checkForConflictingOrders(
             $request->departure_date,
@@ -111,12 +156,12 @@ class TravelOrderController extends Controller
     public function update(UpdateTravelOrderRequest $request, TravelOrder $travelOrder)
 {
         // Verifica se o pedido pertence ao usuário autenticado
-        // if ($travelOrder->user_id !== Auth::id()) {
-        //     return response()->json([
-        //         'status' => 'error',
-        //         'message' => 'You do not have permission to change this order.',
-        //     ], 403);
-        // }
+        if ($travelOrder->user_id !== Auth::id()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'You do not have permission to change this order.',
+            ], 403);
+        }
 
         if ($request->status === 'cancelado' && $travelOrder->status !== 'aprovado') {
             return response()->json([
@@ -177,15 +222,15 @@ class TravelOrderController extends Controller
      * Verifica se há conflitos com pedidos existentes.
      */
     private function checkForConflictingOrders($departureDate, $returnDate)
-{
-    return Auth::user()->travelOrders()
-        ->whereIn('status', ['solicitado', 'aprovado'])
-        ->where(function ($query) use ($departureDate, $returnDate) {
-            $query->where(function ($q) use ($departureDate, $returnDate) {
-                $q->where('departure_date', '<=', $returnDate)
-                  ->where('return_date', '>=', $departureDate);
-            });
-        })
-        ->get();
-}
+    {
+        return Auth::user()->travelOrders()
+            ->whereIn('status', ['solicitado', 'aprovado'])
+            ->where(function ($query) use ($departureDate, $returnDate) {
+                $query->where(function ($q) use ($departureDate, $returnDate) {
+                    $q->where('departure_date', '<=', $returnDate)
+                    ->where('return_date', '>=', $departureDate);
+                });
+            })
+            ->get();
+    }
 }
